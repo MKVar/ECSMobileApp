@@ -1,0 +1,175 @@
+
+# APP_IDENTIFIER
+# P12_TEAM_ID
+# P12_COMMON_NAME
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and Sign IPA"
+  lane :github do
+    puts "APP_NAME: #{ENV['APP_NAME']}"
+    puts "APP_IDENTIFIER: #{ENV['APP_IDENTIFIER']}"
+    puts "APP_VERSION: #{ENV['APP_VERSION']}"
+    puts "APP_BUILD_NUMBER: #{ENV['APP_BUILD_NUMBER']}"
+    # puts "P12_PASSWORD: #{ENV['P12_PASSWORD']}"
+    puts "P12_COMMON_NAME: #{ENV['P12_COMMON_NAME']}"
+    puts "P12_TEAM_ID: #{ENV['P12_TEAM_ID']}"
+    if ENV['APP_IOS_UPLOAD_TO_TESTFLIGHT'] == "true"
+      puts "Uploading to Testflight after build/sign"
+    else
+      puts "NOT uploading to Testflight"
+    end
+
+
+    # Testflight get settings for build number 
+    # - gets set for later also 
+    app_connect_api_key = app_store_connect_api_key(
+      key_id: ENV["APP_IOS_KEY_ID"],
+      issuer_id:  ENV["APP_IOS_ISSUER_ID"],
+      key_filepath: "../whitelabel_config/authkey.p8",
+      duration: 1200, # optional (maximum 1200)
+      in_house: false # optional but may be required if using match/sigh
+    )
+
+    puts "p8 api key: #{app_connect_api_key}"
+
+    # Set Version and Build Number 
+    # - use ENV values if they exist, otherwise increment as normal
+    # - or use built-in version for incrementing
+    if ENV['APP_VERSION'] != "null"
+      # this acts more like "set_version_number" 
+      increment_version_number(
+        version_number: ENV['APP_VERSION'],
+        xcodeproj: "callingiomobileapp.xcodeproj"
+      )
+    end
+    if ENV['APP_BUILD_NUMBER'] != "null"
+      puts "Using ENV build_number"
+      increment_build_number(
+        build_number: ENV['APP_BUILD_NUMBER'],
+        xcodeproj: "callingiomobileapp.xcodeproj"
+      )
+    else
+      puts "Using build number from testflight"
+      increment_build_number(
+        build_number: latest_testflight_build_number(
+          app_identifier: ENV['APP_IDENTIFIER'],
+          version: ENV['APP_VERSION']
+        ) + 1,
+        xcodeproj: "callingiomobileapp.xcodeproj"
+      )
+    end
+
+    # Keychain and provisioning profile
+    create_keychain(
+      name: "keychain",
+      password: 'password',
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      add_to_search_list: true
+    )
+    import_certificate(
+      certificate_path: '../whitelabel_config/distribution.p12',
+      certificate_password: ENV['P12_PASSWORD'],
+      keychain_name: 'keychain', 
+      keychain_password: 'password'
+    )
+    install_provisioning_profile(path: '../whitelabel_config/distribution.mobileprovision')
+    
+    update_project_team(
+      teamid: ENV['P12_TEAM_ID']
+    )
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "callingiomobileapp.xcodeproj",
+      bundle_identifier: ENV['APP_IDENTIFIER']
+    )
+    update_app_identifier( 
+      app_identifier: ENV['APP_IDENTIFIER'],
+      plist_path: "callingiomobileapp/Info.plist",
+      xcodeproj: "callingiomobileapp.xcodeproj"
+    )
+    update_info_plist(
+      plist_path: "callingiomobileapp/Info.plist",
+      app_identifier: ENV['APP_IDENTIFIER'],
+      display_name: ENV['APP_NAME']
+    )
+    update_project_provisioning( 
+      xcodeproj: "callingiomobileapp.xcodeproj",
+      target_filter: "callingiomobileapp",
+      profile: "../whitelabel_config/distribution.mobileprovision",
+      build_configuration: "Release",
+      code_signing_identity: ENV['P12_COMMON_NAME']
+    )
+    build_app(
+      workspace: "callingiomobileapp.xcworkspace", 
+      scheme: "callingiomobileapp", 
+      configuration: "Release", 
+      clean: true,
+      export_method: "app-store",
+      # export_options: {
+      #   provisioningProfiles: { 
+      #     ENV['APP_IDENTIFIER'] => "Callingio Profile Dist 2"
+      #   }
+      # },
+      output_directory: "./gh_builds",
+      output_name: "callingiomobileapp.ipa",
+      codesigning_identity: ENV['P12_COMMON_NAME']
+    )
+    delete_keychain(
+      name: "keychain"
+    )
+
+    # Testflight upload
+    if ENV['APP_IOS_UPLOAD_TO_TESTFLIGHT'] == "true"
+      # catch errors and continue 
+      begin
+        upload_to_testflight(
+          skip_waiting_for_build_processing: true # make this "false" if we use `distribute_external` later (for auto-uploading to External Testers)
+        )
+      rescue => ex
+        puts "Testflight Upload Failed"
+        puts ex
+      end
+    end
+  end
+
+  # # local build 
+  # lane :localbeta do
+  #   increment_build_number(xcodeproj: "callingiomobileapp.xcodeproj")
+  #   # Create or get provisioning profile
+  #   # - TODO: simply replace with the GithubSecrets values!
+  #   # - user will provide the values in `builds`
+  #   # get_certificates( 
+  #   #   output_path: "./builds"
+  #   # )
+  #   # get_provisioning_profile( 
+  #   #   output_path: "./builds",
+  #   #   filename: "provisioning.mobileprovision" 
+  #   # )
+  #   update_project_provisioning( 
+  #     xcodeproj: "callingiomobileapp.xcodeproj",
+  #     target_filter: "callingiomobileapp",
+  #     profile: "./builds/provisioning.mobileprovision",
+  #     build_configuration: "Release",
+  #     code_signing_identity: "Apple Distribution: Nicholas Reed (WN657WY3R9)"
+  #   )
+  #   update_project_team( # Set the right team on your project
+  #     teamid: CredentialsManager::AppfileConfig.try_fetch_value(:team_id)
+  #   )
+  #   build_app(
+  #     workspace: "callingiomobileapp.xcworkspace", 
+  #     scheme: "callingiomobileapp", 
+  #     configuration: "Release", 
+  #     clean: true,
+  #     export_method: "app-store",
+  #     output_directory: "./builds",
+  #     output_name: "callingiomobileapp.ipa",
+  #     #xcargs: "-allowProvisioningUpdates",
+  #     codesigning_identity: "Apple Distribution: Nicholas Reed (WN657WY3R9)"
+  #   )
+  #   # upload_to_testflight
+  # end
+end
