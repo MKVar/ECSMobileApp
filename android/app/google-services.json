@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "228089617193",
+    "project_id": "callingio-mobile-app",
+    "storage_bucket": "callingio-mobile-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:228089617193:android:f82131808087d98d41b538",
+        "android_client_info": {
+          "package_name": "com.labs.tokdesk"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "228089617193-mv7eee1pdu7ktare13nf2piu78fck8ek.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.labs.tokdesk",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "228089617193-l4rbsgtnmtsfonn0bi95vqi1ugj9egl3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1KeiTkSFoK7TKFgRGKOweSwnvqvgxyIw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "228089617193-l4rbsgtnmtsfonn0bi95vqi1ugj9egl3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
